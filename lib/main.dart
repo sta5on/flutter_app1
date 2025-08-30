@@ -26,8 +26,13 @@ class MyApp extends StatelessWidget {
 
 class MyAppState extends ChangeNotifier {
   var current = WordPair.random();
+  var history = <WordPair>[];
 
   void getNext() {
+    history.insert(0, current);
+    if (history.length > 6) {
+      history.removeLast();
+    }
     current = WordPair.random();
     notifyListeners();
   }
@@ -40,6 +45,11 @@ class MyAppState extends ChangeNotifier {
     } else {
       favorites.add(current);
     }
+    notifyListeners();
+  }
+
+  void removeFavorite(WordPair pair) {
+    favorites.remove(pair);
     notifyListeners();
   }
 }
@@ -120,14 +130,30 @@ class GeneratorPage extends StatelessWidget {
       icon = Icons.favorite_border;
     }
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          BigCard(pair: pair),
-          SizedBox(height: 10),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+    return Stack(
+      children: [
+        // Главное слово строго по центру с анимацией
+        Center(
+          child: AnimatedSwitcher(
+            duration: Duration(milliseconds: 40),
+            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+            child: BigCard(key: ValueKey(pair), pair: pair),
+          ),
+        ),
+        // История слов поверх, выравнивание вверх, с анимацией
+        Positioned(
+          top: 40,
+          left: 0,
+          right: 0,
+          child: _AnimatedHistoryList(appState: appState),
+        ),
+        // Кнопки под главным словом
+        Positioned(
+          bottom: 60,
+          left: 0,
+          right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton.icon(
                 onPressed: () {
@@ -145,7 +171,68 @@ class GeneratorPage extends StatelessWidget {
               ),
             ],
           ),
-        ],
+        ),
+      ],
+    );
+
+// Анимированный список истории слов
+  }
+}
+
+class _AnimatedHistoryList extends StatefulWidget {
+  final MyAppState appState;
+  const _AnimatedHistoryList({required this.appState});
+
+  @override
+  State<_AnimatedHistoryList> createState() => _AnimatedHistoryListState();
+}
+
+class _AnimatedHistoryListState extends State<_AnimatedHistoryList> {
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
+
+  @override
+  Widget build(BuildContext context) {
+    final history = widget.appState.history;
+    final showCount = history.length > 6 ? 6 : history.length;
+    return SizedBox(
+      height: showCount * 32.0,
+      child: AnimatedList(
+        key: _listKey,
+        initialItemCount: showCount,
+        itemBuilder: (context, i, animation) {
+          final index = showCount - 1 - i;
+          final historyPair = history[index];
+          final isBlur = index == 5;
+          final isFavorite = widget.appState.favorites.contains(historyPair);
+          return SizeTransition(
+            sizeFactor: animation,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 7.0),
+              child: Opacity(
+                opacity: isBlur ? 0.4 : 1.0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isFavorite)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4.0),
+                        child: Icon(Icons.favorite, color: Colors.red, size: 18),
+                      ),
+                    RichText(
+                      text: TextSpan(
+                        style: Theme.of(context).textTheme.bodyLarge,
+                        children: [
+                          TextSpan(text: historyPair.first),
+                          TextSpan(text: historyPair.second, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -162,17 +249,32 @@ class FavoritesPage extends StatelessWidget {
       );
     }
 
-    return ListView(
+    return GridView.count(
+      crossAxisCount: 2,
+      childAspectRatio: 4,
+      padding: const EdgeInsets.all(20),
       children: [
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text('You have '
-              '${appState.favorites.length} favorites:'),
-        ),
         for (var pair in appState.favorites)
-          ListTile(
-            leading: Icon(Icons.favorite),
-            title: Text(pair.asLowerCase),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.delete),
+                onPressed: () {
+                  appState.removeFavorite(pair);
+                },
+              ),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: Theme.of(context).textTheme.bodyLarge,
+                    children: [
+                      TextSpan(text: pair.first),
+                      TextSpan(text: pair.second, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
       ],
     );
@@ -199,7 +301,15 @@ class BigCard extends StatelessWidget {
       color: theme.colorScheme.primary,
       child: Padding(
         padding: const EdgeInsets.all(30.0),
-        child: Text(pair.asLowerCase, style: style),
+        child: RichText(
+          text: TextSpan(
+            style: style,
+            children: [
+              TextSpan(text: pair.first),
+              TextSpan(text: pair.second, style: const TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
       ),
     );
   }
