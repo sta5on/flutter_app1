@@ -135,7 +135,7 @@ class GeneratorPage extends StatelessWidget {
         // Главное слово строго по центру с анимацией
         Center(
           child: AnimatedSwitcher(
-            duration: Duration(milliseconds: 40),
+            duration: Duration(milliseconds: 100),
             transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
             child: BigCard(key: ValueKey(pair), pair: pair),
           ),
